@@ -2,8 +2,8 @@
 
 html,body {
 	height:100%;
-    /*background:center no-repeat fixed url('http://www.webdesignstash.com/api/bg');*/
-    background: center no-repeat fixed url('https://static1.squarespace.com/static/56949a4340667aed164255cc/t/56ae12c1ab2810ccc9acaf1d/1454248644249/ny-bluedfiltered_dark1920.png');
+    background:center no-repeat fixed url('http://www.webdesignstash.com/api/bg');
+    /*background: center no-repeat fixed url('https://static1.squarespace.com/static/56949a4340667aed164255cc/t/56ae12c1ab2810ccc9acaf1d/1454248644249/ny-bluedfiltered_dark1920.png');*/
     background-size: cover;
     color:#444;
     font-family: 'Questrial', sans-serif;
