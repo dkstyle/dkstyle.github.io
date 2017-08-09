@@ -1,0 +1,1 @@
+Errant query:  SELECT * FROM `voters` WHERE `edge`= 

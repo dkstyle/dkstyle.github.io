@@ -1,0 +1,4 @@
+id,latitude,longitude,name,display_name,zone,total_lines,rail
+1,1124.93,-999.40,"kr0002",NULL,Barcelona,1,0
+2,1130.32,-1007.56,Almeda,NULL,"Cornellà de Llobregat",1,0
+3,1131.02,-1012.62,"Arc de Triomf",NULL,Barcelona,1,0

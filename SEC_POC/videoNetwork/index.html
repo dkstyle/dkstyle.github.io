@@ -1,0 +1,88 @@
+<!doctype html>
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+  <title>1-mode Network Clustering</title>
+  <meta name="description" content="PoC Demo for How to Build an Interactive Network Visualization.">
+  <meta name="author" content="Dongkyun Yoo">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <!-- CSS concatenated and minified via ant build script-->
+  <link rel="stylesheet" href="../css/reset.css">
+  <link rel="stylesheet" href="../css/bootstrap.css">
+  <link rel="stylesheet" href="../css/style.css">
+  <!-- end CSS-->
+  <script src="../js/libs/modernizr-2.0.6.min.js"></script>
+</head>
+<body>
+  <div id="container" class="container">
+    <header>
+        <div class="navbar navbar-fixed-top">
+      <div class="navbar-inner">
+          <a class="brand" href="#"><img src="../img/ibm-logo.png"></a>
+          	<div class="nav-collapse">
+            	<ul class="nav">
+              		<li class="active"><a href="#">Video Network</a></li>
+              		<li><a href="../chatonNetwork/index.html">ChatOn Network</a></li>
+           	 	</ul><!-- /.nav -->
+          	</div><!--/.nav-collapse -->
+      </div><!-- /.navbar-inner -->
+    	</div><!-- /.navbar -->
+    </header>
+
+      <!-- div id="data_selection" class="control">
+        <h3>Data source</h3>
+        <select id="data_select">
+          <option value="Video_Network.json">Video network</option>
+          <option value="ChatOn.json">ChatOn network</option>
+        </select>
+      </div -->
+   	<p style="height: 30px;"></p>
+    <div id="controls">
+      <div id="layouts" class="control">
+        <h5>View</h5>
+        <a id="radial" class="active">Cluster 보기</a>
+        <a id="force">Force Directed</a>
+      </div>
+      <div id="filters" class="control">
+        <h5>Filter</h5>
+        <a id="all" class="active">전부</a>
+        <a id="popular">상위50%</a>
+        <a id="obscure">하위50%</a>
+        <a id="topTier">상위10%</a>
+        <a id="rank_bc">Rank BC</a>
+        <a id="rank_pr">Rank PR</a>
+      </div>
+      <div id="sorts" class="control">
+        <h5>Sort By</h5>
+        <a id="clusters" class="active">Cluster 순</a>
+        <a id="links">Links 순</a>
+      </div>
+      <div id="highlights" class="control">
+        <h5>Highlight</h5>
+        <a id="high_none" class="active">Default</a>
+        <a id="high_bc">B.C</a>
+        <a id="high_pr">P.R</a>
+      </div>
+      <!--  div id="search_section" class="control">
+        <form id="search_form" action=""  method="post">
+          <p class="search_title">Search <input type="text" class="text-input" id="search" value="" /></p>
+        </form>
+      </div -->
+    <div id="main" role="main">
+      <div id="vis"></div>
+    </div>
+  </div> <!--! end of #container -->
+  <script>window.jQuery || document.write('<script src="../js/libs/jquery-1.7.2.min.js"><\/script>')</script>
+  <script defer src="../js/libs/plugins.js"></script>
+  <script defer src="../js/video_network.js"></script>
+  <script src="../js/libs/d3.v3.js"></script>
+  <script src="../js/libs/Tooltip.js"></script>
+
+  <!-- script> // Change UA-XXXXX-X to be your site's ID
+    window._gaq = [['_setAccount','UAXXXXXXXX1'],['_trackPageview'],['_trackPageLoadTime']];
+    Modernizr.load({
+      load: ('https:' == location.protocol ? '//ssl' : '//www') + '.google-analytics.com/ga.js'
+    });
+  </script -->  
+</body>
+</html>

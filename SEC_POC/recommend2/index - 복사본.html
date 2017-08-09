@@ -1,0 +1,465 @@
+
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<title>Barcelona metro travel time map</title>
+		<script src="../js/libs/d3.v3.min.js"></script>
+		<script src="../js/libs//jquery-1.7.2.min.js"></script>
+		<style type="text/css">
+		/* Eric Meyer's Reset CSS v2.0 - http://cssreset.com */
+		html,body,div,span,applet,object,iframe,h1,h2,h3,h4,h5,h6,p,blockquote,pre,a,abbr,acronym,address,big,cite,code,del,dfn,em,img,ins,kbd,q,s,samp,small,strike,strong,sub,sup,tt,var,b,u,i,center,dl,dt,dd,ol,ul,li,fieldset,form,label,legend,table,caption,tbody,tfoot,thead,tr,th,td,article,aside,canvas,details,embed,figure,figcaption,footer,header,hgroup,menu,nav,output,ruby,section,summary,time,mark,audio,video{border:0;font-size:100%;font:inherit;vertical-align:baseline;margin:0;padding:0}article,aside,details,figcaption,figure,footer,header,hgroup,menu,nav,section{display:block}body{line-height:1}ol,ul{list-style:none}blockquote,q{quotes:none}blockquote:before,blockquote:after,q:before,q:after{content:none}table{border-collapse:collapse;border-spacing:0}
+
+		body {
+			margin: 4em;
+			font-family: "Helvetica Neue", Helvetica, Arial, sans-serif; 
+			font-size: 14px; 
+			background-color: #fff; 
+			color: #333;
+			text-align: center;
+			line-height: 20px;
+		}
+
+		#content {
+			margin: 0px auto;
+			text-align:left;
+		}
+
+		#info{
+			width: 700px;
+		}
+
+		.header{
+			margin: 0 0 2em 0;
+		}
+
+		h1, h2{
+			line-height: 40px;			
+		}
+
+		h1{
+			font-size: 32px;
+			font-weight: bold;
+		}
+
+		h2{
+			font-size: 24px;
+			font-weight: bold;
+		}
+
+		p{
+			margin: 0 0 1em 0;
+		}
+
+		ol, ul{
+			padding: 0;
+			margin: 0 0 10px 25px;
+		}
+
+		li {
+			list-style-type: disc;
+		}
+
+		a{
+			color: #0088cc;
+			text-decoration: none;			
+		}
+
+		a:hover {
+			color: #005580;
+			text-decoration: underline;
+		}
+
+		#map {
+			clear: both;
+			border: 1px solid #eee;
+			margin: 0 0 2em 0;  
+		}
+
+		</style>
+<script type="text/javascript">
+"use strict";
+
+var w = 1000,
+	h = 500;
+
+var radiusMinutes = 5;
+		
+var pixelsPerMinute = w/75;
+
+window.onload = function() {
+
+	$("#content").css("width", w);
+	$("#map").css("width", w);
+	$("#map").css("height", h);
+
+	d3.csv('stations.csv', function(stations) {
+
+		var minLat = 90, 
+			minLon = 180, 
+			maxLat = -90, 
+			maxLon = -180,
+			stationsById = {};
+
+		// measure...
+		stations.forEach(function(s) {
+			stationsById[s.id] = s;
+			s.conns = [];
+			s.display_name = (s.display_name == 'NULL') ? null : s.display_name;
+			s.rail = parseInt(s.rail,10);
+			//s.totalLines = parseInt(s.total_lines,10);
+			// console.log(s);
+			s.latitude = parseFloat(s.latitude);
+			s.longitude = parseFloat(s.longitude);
+			minLat = Math.min(minLat, s.latitude);
+			maxLat = Math.max(maxLat, s.latitude);
+			minLon = Math.min(minLon, s.longitude);
+			maxLon = Math.max(maxLon, s.longitude);
+		});
+
+		var padding = 10;
+		stations.forEach(function(s) {
+			s.mapx = padding + (w-padding*2) * (s.longitude-minLon) / (maxLon-minLon);
+			s.mapy = h-padding - (h-padding*2) * (s.latitude-minLat) / (maxLat-minLat);
+		});
+				
+		//console.log(stations);
+		
+		d3.csv('lines.csv', function(connections) {
+		
+			//console.log(connections);
+			
+			connections.forEach(function(c) {
+				c.station1 = stationsById[c.station1];
+				c.station2 = stationsById[c.station2];
+				c.station1.conns.push(c);
+				c.station2.conns.push(c);
+				c.time = parseInt(c.time,10)/60;
+			});
+
+			d3.csv('routes.csv', function(routes) {
+		
+				//console.log(routes);
+				
+				var routesById = {};
+				
+				routes.forEach(function(r) {
+					routesById[r.line] = r;
+				});
+
+				var vis = d3.select("#map")
+					.append("svg:svg")
+					.attr("width", w)
+					.attr("height", h);
+
+				// vis = vis.append("svg:g")
+				// 	.attr("translate", + w/2 + "," + h/2)
+				// 	.attr("transform", "rotate(45 " + w/2 + " " + h/2 + ")");
+
+				var maxMinutes = (Math.max(w,h) / pixelsPerMinute) / 2;
+				var radii = d3.range(pixelsPerMinute * radiusMinutes, Math.max(w,h), pixelsPerMinute * radiusMinutes);
+				radii.reverse();
+
+				var tooltip = d3.select("body")
+					.append("div")
+					.style("position", "absolute")
+					.style("z-index", "10")
+					.style("visibility", "hidden")
+					.style("font-size", "18px")
+					.style("font-weight", "bold")
+					.style("background", "#fff")
+					.text("");
+
+				var selectedStation = d3.select("body")
+					.append("div")
+					.style("position", "absolute")
+					.style("z-index", "10")
+					.style("visibility", "hidden")
+					.style("font-size", "18px")
+					.style("font-weight", "bold")
+					.style("background", "#fff")
+					.text("");
+
+				var radius = vis.selectAll('circle.radius')
+					.data(radii)
+					.enter()
+					.append('svg:circle')
+					.attr('class','radius')
+					.attr('fill',function(d,i) { 
+						return i%2==0 ? '#e6e6e6' : '#fff';
+					})
+					.attr("stroke-dasharray", "10, 50")
+					.attr('cx', w/2)
+					.attr('cy', h/2)
+					.attr('r', Number)
+					.style('opacity', 0);
+
+				var route = vis.selectAll("line.route")
+					.data(connections)
+					.enter()
+					.append("svg:line")
+					.attr("class", "route")
+					.attr("stroke", function(d) { 
+							return '#'+routesById[d.line].colour; 
+						})
+					.attr("stroke-width", 6)
+					.attr("stroke-linecap", 'round')
+					.attr("x1", function(d) { return d.station1.mapx; })
+					.attr("y1", function(d) { return d.station1.mapy; })
+					.attr("x2", function(d) { return d.station2.mapx; })
+					.attr("y2", function(d) { return d.station2.mapy; });        
+
+				var stripe = vis.selectAll("line.stripe")
+					.data(connections.filter(function(d) { return routesById[d.line].stripe != "NULL"; }))
+					.enter()
+					.append("svg:line")
+					.attr("class", "stripe")
+					.attr("stroke", function(d) { return '#'+routesById[d.line].stripe; })
+					.attr("stroke-width", 3)
+					.attr("stroke-linecap", 'round')
+					.attr("x1", function(d) { return d.station1.mapx; })
+					.attr("y1", function(d) { return d.station1.mapy; })
+					.attr("x2", function(d) { return d.station2.mapx; })
+					.attr("y2", function(d) { return d.station2.mapy; });
+				
+				var connect = vis.selectAll("circle.connect")
+					.data(stations.filter(function(d) { return d.totalLines - d.rail > 1; }))
+					.enter().
+					append("svg:circle")
+					.attr("class", "connect")
+					.attr("cx", function(d) { return d.mapx; })
+					.attr("cy", function(d) { return d.mapy; })
+					.attr("r", 6)
+					.style("fill", 'white')
+					.style("stroke", 'black')
+					.style("stroke-width", 0.5);
+
+				var option = d3.select('#navi')
+					.on('change', function() {
+						var box = document.getElementById('navi'),
+								destination = box.options[box.selectedIndex].value;
+						selectStation(stationsById[destination]);
+					})
+					.selectAll('option')
+					.data( [ { id: 0, name: "Geographic Layout" } ].concat(stations) )
+					.enter()
+					.append('option')
+					.attr('value', function(d) { return d.id })
+					.text(function(d) { return d.name });                           
+				window.onkeyup = function(e) {
+					if (String.fromCharCode(e.keyCode).toLowerCase() == 'g') {
+						var box = document.getElementById('navi');
+						box.selectedIndex = 0;
+						selectStation(null);
+					}
+				}
+				 
+				function selectStation(d, i) {
+
+					updateShortestPaths(d, stations);
+
+					if (i) {
+
+						var box = document.getElementById('navi');
+						box.selectedIndex = i+1;
+
+						selectedStation.style("left", (d.x + 10) +"px")
+							.style("top", (d.y - 0) + "px")
+							// .style("visibility", "visible")
+							.text(d.name);
+
+					}
+
+					d3.selectAll('circle.radius')
+						.transition()
+						.duration(1000)
+						.style("opacity", d ? 1 : 0)
+						.attr("cx", d ? d.x : w/2)
+						.attr("cy", d ? d.y : h/2);
+
+					d3.selectAll('circle.connect, circle.station')
+						.style("fill", function(dHere){
+							return (d && d.id == dHere.id) ? '#f00' : '#fff';
+						})
+						.attr("stroke", function(dHere){
+							return (d && d.id == dHere.id) ? '#f00' : '#fff';
+						})
+						.attr("stroke-width", function(dHere){
+							return (d && d.id == dHere.id) ? '10' : '0';
+						});
+
+					d3.selectAll('circle.connect, circle.station')
+						.transition()
+						.duration(1000)
+						.attr("cx", function(d) { 
+							return d.x; 
+						})
+						.attr("cy", function(d) { 
+							return d.y; 
+						});
+
+					d3.selectAll("line.route, line.stripe")
+						.transition()
+						.duration(1000)
+						.attr("x1", function(d) { return d.station1.x; })
+						.attr("y1", function(d) { return d.station1.y; })
+						.attr("x2", function(d) { return d.station2.x; })
+						.attr("y2", function(d) { return d.station2.y; });
+
+				};
+
+				var station = vis.selectAll("circle.station")
+					.data(stations)
+					.enter()
+					.append("svg:circle")
+					.attr("class", "station")
+					.attr("id", function(d) { return 'station'+d.id })
+					.attr("cx", function(d) { return d.mapx; })
+					.attr("cy", function(d) { return d.mapy; })
+					.attr("r", 3)
+					// .style("stroke", 'black')
+					// .style("opacity", 0)
+					.style('fill', 'white')
+					.on('mouseover', function(d,i) {
+						d3.selectAll('#station'+d.id)
+						.transition()
+						.duration(25)
+						 .style('opacity', 1.0);
+						// console.log(d.name);
+					 })
+					.on('mouseout', function(d,i) {
+						d3.selectAll('#station'+d.id)
+						.transition()
+						.duration(25)
+						.style('opacity', 0.0);
+					 })
+					.on('click', selectStation)
+					.on("mouseover", function(d){
+						var text = d.name;
+						if (d.timeToCentre) {
+							text += " " + Math.round(parseFloat(d.timeToCentre)) + " min";
+						};
+						tooltip.text(text);
+						return tooltip.style("visibility", "visible");
+					})
+					.on("mousemove", function(){
+						return tooltip.style("top", (event.pageY-10)+"px").style("left",(event.pageX+10)+"px");
+					})
+					.on("mouseout", function(){
+						return tooltip.style("visibility", "hidden");
+					});
+
+			}); // load routes
+			
+		}); // load lines
+		
+	}); // load stations
+
+}
+
+// cribbed from here in double quick time: http://www.cs.cmu.edu/~crpalmer/sp/
+function updateShortestPaths(centre, stations) {
+
+	if (!centre) {
+		stations.forEach(function(s) {
+			s.x = s.mapx;
+			s.y = s.mapy;
+		});  
+		return;
+	}
+
+	stations.forEach(function(s) {
+		s.timeToCentre = (s == centre) ? 0 : Number.MAX_VALUE;
+		s.pathParent = null;
+	});
+
+	var queue = [];
+	queue.push(centre); 
+	
+	function compareTimes(a,b) {
+		return a.timeToCentre < b.timeToCentre ? -1 : a.timeToCentre > b.timeToCentre ? 1 : 0;
+	}
+
+	while (queue.length > 0) {
+		queue.sort(compareTimes);
+		var v = queue.pop();
+		for (var i = 0; i < v.conns.length; i++) {
+			var c = v.conns[i];
+			var u = (c.station1 == v) ? c.station2 : c.station1;
+			if (c.time + v.timeToCentre < u.timeToCentre) {
+				u.pathParent = v;
+				u.timeToCentre = c.time + v.timeToCentre + 0.45;
+				queue.push(u);
+			}
+		}
+	}
+
+	stations.forEach(function(s) {
+		var ang = Math.atan2(s.mapy - centre.mapy, s.mapx - centre.mapx),
+				rad = pixelsPerMinute * s.timeToCentre; // todo: limit to min(width/2,height/2)?
+		s.x = centre.mapx + (rad * Math.cos(ang));
+		s.y = centre.mapy + (rad * Math.sin(ang));
+
+	});
+
+}
+		
+		</script>
+	</head>
+	<body>
+		<div id="content">
+			
+			<table width="100%" class="header">
+				<tr>
+					<td>
+						<h1 class="title">Barcelona metro travel time map</h1>
+					</td>
+					<td align="right">
+						<form class="naviForm">
+							<select id="navi"></select>
+						</form>
+					</td>
+				</tr>			
+			</table>
+
+			<div id="map">
+			</div>
+
+			<div id="info">
+
+				<p>In the intial map, the positions of the stations represent their geographic location.</p>
+				<p>Click on a station to see the city from that perspective. The map will calculate the shortest route to all stations from there. The longer it takes to get to a station, the further away it is on this map. Heading from the selected station is preserved. Each circle represents 5 minutes of travelling.</p>
+				
+				<h2>Credits</h2>
+				<p>Based on <a href="http://www.tom-carden.co.uk/p5/tube_map_travel_times/applet/">Tom Carden's classic London travel time tube map</a>. I used the <a href="https://github.com/RandomEtc/travel-time-tube-d3/">d3 version</a> as a starting point. My changes include date for Barcelona and small improvements to the interface.</p>
+
+				<h2>Data</h2>
+				<p>TMB is the agency in charge of the metro network in Barcelona. It currently doesn't offer any API or timetable. I got the locations of the stations and the lines from <a href="http://en.wikipedia.org/wiki/List_of_Barcelona_metro_stations">Wikipedia</a>. I calculated the travel time between each station using the Google Maps Directions API.</p>
+
+				<h2>Caveats</h2>
+				<p>The map gives a good enough general idea about travel times, but it's not entirely exact because of 2 reasons:</p>
+				<ul>
+					<li>I assumed that a stop takes 45 seconds.</li>
+					<li>Transfer times are not taken into account. In some stations, changing lines may take several minutes.</li>
+				</ul>
+
+				<h2>Poster</h2>
+				<p>I also did a poster version that show the Barcelona metro network from the point of view of the Bogatell station in Poblenou.</p>
+				<p>Labels were positioned using d3's force layout and cleaned up in Illustrator.</p>
+
+				<h2>Contact</h2>
+				<p>
+					Bert Balcaen
+					<br>
+					<a href="mailto:bert@rekalldesign.com">bert@rekalldesign.com</a>
+					<br>
+					<a href="http://theworldneedsmoredreamers.net">theworldneedsmoredreamers.net</a>
+					<br>
+				</p>
+
+			</div>
+
+		</div>
+		 
+	</body>
+</html>

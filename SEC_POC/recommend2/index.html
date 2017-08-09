@@ -1,0 +1,425 @@
+
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<title>Barcelona metro travel time map</title>
+		<script src="../js/libs/d3.v3.min.js"></script>
+		<script src="../js/libs//jquery-1.7.2.min.js"></script>
+		<style type="text/css">
+		/* Eric Meyer's Reset CSS v2.0 - http://cssreset.com */
+		html,body,div,span,applet,object,iframe,h1,h2,h3,h4,h5,h6,p,blockquote,pre,a,abbr,acronym,address,big,cite,code,del,dfn,em,img,ins,kbd,q,s,samp,small,strike,strong,sub,sup,tt,var,b,u,i,center,dl,dt,dd,ol,ul,li,fieldset,form,label,legend,table,caption,tbody,tfoot,thead,tr,th,td,article,aside,canvas,details,embed,figure,figcaption,footer,header,hgroup,menu,nav,output,ruby,section,summary,time,mark,audio,video{border:0;font-size:100%;font:inherit;vertical-align:baseline;margin:0;padding:0}article,aside,details,figcaption,figure,footer,header,hgroup,menu,nav,section{display:block}body{line-height:1}ol,ul{list-style:none}blockquote,q{quotes:none}blockquote:before,blockquote:after,q:before,q:after{content:none}table{border-collapse:collapse;border-spacing:0}
+
+		body {
+			margin: 4em;
+			font-family: "Helvetica Neue", Helvetica, Arial, sans-serif; 
+			font-size: 14px; 
+			background-color: #fff; 
+			color: #333;
+			text-align: center;
+			line-height: 20px;
+		}
+
+		#content {
+			margin: 0px auto;
+			text-align:left;
+		}
+
+		#info{
+			width: 700px;
+		}
+
+		.header{
+			margin: 0 0 2em 0;
+		}
+
+		h1, h2{
+			line-height: 40px;			
+		}
+
+		h1{
+			font-size: 32px;
+			font-weight: bold;
+		}
+
+		h2{
+			font-size: 24px;
+			font-weight: bold;
+		}
+
+		p{
+			margin: 0 0 1em 0;
+		}
+
+		ol, ul{
+			padding: 0;
+			margin: 0 0 10px 25px;
+		}
+
+		li {
+			list-style-type: disc;
+		}
+
+		a{
+			color: #0088cc;
+			text-decoration: none;			
+		}
+
+		a:hover {
+			color: #005580;
+			text-decoration: underline;
+		}
+
+		#map {
+			clear: both;
+			border: 1px solid #eee;
+			margin: 0 0 2em 0;  
+		}
+
+		</style>
+<script type="text/javascript">
+"use strict";
+
+var w = 1000,
+	h = 500;
+
+var radiusMinutes = 5;
+		
+var pixelsPerMinute = w/75;
+
+window.onload = function() {
+
+	$("#content").css("width", w);
+	$("#map").css("width", w);
+	$("#map").css("height", h);
+
+	d3.json('../data/Video_Network.json', function(data) {
+		var nodes = data.nodes;
+		var links = data.links;
+		var stations = data.nodes
+		var minLat = 90, 
+			minLon = 180, 
+			maxLat = -90, 
+			maxLon = -180,
+			stationsById = {};
+
+		// measure...
+		stations.forEach(function(s) {
+			stationsById[s.name] = s;
+			s.conns = [];
+			s.display_name = (s.display_name == 'NULL') ? null : s.display_name;
+			s.rail = parseInt(s.rail,10);
+			//s.totalLines = parseInt(s.total_lines,10);
+			// console.log(s);
+			s.pos_x = parseFloat(s.pos_x);
+			s.pos_y = parseFloat(s.pos_y);
+			minLat = Math.min(minLat, s.pos_x);
+			maxLat = Math.max(maxLat, s.pos_x);
+			minLon = Math.min(minLon, s.pos_y);
+			maxLon = Math.max(maxLon, s.pos_y);
+		});
+
+		var padding = 10;
+		stations.forEach(function(s) {
+			s.mapx = padding + (w-padding*2) * (s.pos_y-minLon) / (maxLon-minLon);
+			s.mapy = h-padding - (h-padding*2) * (s.pos_x-minLat) / (maxLat-minLat);
+		});
+				
+		//console.log(stations);
+			var connections = data.links
+			//console.log(connections);
+			
+			connections.forEach(function(c) {
+				c.source = stationsById[c.source];
+				c.target = stationsById[c.target];
+				c.source.conns.push(c);
+				c.target.conns.push(c);
+				c.time = 5;//parseInt(c.time,10)/60;
+			});
+
+			var routes = data.nodes
+				//console.log(routes);
+				
+				var routesById = {};
+				
+				routes.forEach(function(r) {
+					routesById[r.cluster] = r;
+				});
+
+				var vis = d3.select("#map")
+					.append("svg:svg")
+					.attr("width", w)
+					.attr("height", h);
+
+				// vis = vis.append("svg:g")
+				// 	.attr("translate", + w/2 + "," + h/2)
+				// 	.attr("transform", "rotate(45 " + w/2 + " " + h/2 + ")");
+
+				var maxMinutes = (Math.max(w,h) / pixelsPerMinute) / 2;
+				var radii = d3.range(pixelsPerMinute * radiusMinutes, Math.max(w,h), pixelsPerMinute * radiusMinutes);
+				radii.reverse();
+
+				var tooltip = d3.select("body")
+					.append("div")
+					.style("position", "absolute")
+					.style("z-index", "10")
+					.style("visibility", "hidden")
+					.style("font-size", "18px")
+					.style("font-weight", "bold")
+					.style("background", "#fff")
+					.text("");
+
+				var selectedStation = d3.select("body")
+					.append("div")
+					.style("position", "absolute")
+					.style("z-index", "10")
+					.style("visibility", "hidden")
+					.style("font-size", "18px")
+					.style("font-weight", "bold")
+					.style("background", "#fff")
+					.text("");
+
+				var radius = vis.selectAll('circle.radius')
+					.data(radii)
+					.enter()
+					.append('svg:circle')
+					.attr('class','radius')
+					.attr('fill',function(d,i) { 
+						return i%2==0 ? '#e6e6e6' : '#fff';
+					})
+					.attr("stroke-dasharray", "10, 50")
+					.attr('cx', w/2)
+					.attr('cy', h/2)
+					.attr('r', Number)
+					.style('opacity', 0);
+
+				var route = vis.selectAll("line.route")
+					.data(connections)
+					.enter()
+					.append("svg:line")
+					.attr("class", "route")
+					.attr("stroke", function(d) { 
+							return 'gray';
+						})
+					.attr("stroke-width", 6)
+					.attr("stroke-linecap", 'round')
+					.attr("x1", function(d) { return d.source.mapx; })
+					.attr("y1", function(d) { return d.source.mapy; })
+					.attr("x2", function(d) { return d.target.mapx; })
+					.attr("y2", function(d) { return d.target.mapy; });        
+
+				var stripe = vis.selectAll("line.stripe")
+					.data(connections) //.filter(function(d) { return routesById[d.cluster].stripe != "NULL"; })
+					.enter()
+					.append("svg:line")
+					.attr("class", "stripe")
+					//.attr("stroke", function(d) { return '#'+routesById[d.cluster].stripe; })
+					.attr("stroke-width", 3)
+					.attr("stroke-linecap", 'round')
+					.attr("x1", function(d) { return d.source.mapx; })
+					.attr("y1", function(d) { return d.source.mapy; })
+					.attr("x2", function(d) { return d.target.mapx; })
+					.attr("y2", function(d) { return d.target.mapy; });
+				
+				var connect = vis.selectAll("circle.connect")
+					.data(stations.filter(function(d) { return d.totalLines - d.rail > 1; }))
+					.enter().
+					append("svg:circle")
+					.attr("class", "connect")
+					.attr("cx", function(d) { return d.mapx; })
+					.attr("cy", function(d) { return d.mapy; })
+					.attr("r", 6)
+					.style("fill", 'white')
+					.style("stroke", 'black')
+					.style("stroke-width", 0.5);
+
+				var option = d3.select('#navi')
+					.on('change', function() {
+						var box = document.getElementById('navi'),
+								destination = box.options[box.selectedIndex].value;
+						selectStation(stationsById[destination]);
+					})
+					.selectAll('option')
+					.data( [ { id: 0, name: "Geographic Layout" } ].concat(stations) )
+					.enter()
+					.append('option')
+					.attr('value', function(d) { return d.name })
+					.text(function(d) { return d.name });                           
+				window.onkeyup = function(e) {
+					if (String.fromCharCode(e.keyCode).toLowerCase() == 'g') {
+						var box = document.getElementById('navi');
+						box.selectedIndex = 0;
+						selectStation(null);
+					}
+				}
+				 
+				function selectStation(d, i) {
+
+					updateShortestPaths(d, stations);
+
+					if (i) {
+
+						var box = document.getElementById('navi');
+						box.selectedIndex = i+1;
+
+						selectedStation.style("left", (d.x + 10) +"px")
+							.style("top", (d.y - 0) + "px")
+							// .style("visibility", "visible")
+							.text(d.name);
+
+					}
+
+					d3.selectAll('circle.radius')
+						.transition()
+						.duration(1000)
+						.style("opacity", d ? 1 : 0)
+						.attr("cx", d ? d.x : w/2)
+						.attr("cy", d ? d.y : h/2);
+
+					d3.selectAll('circle.connect, circle.station')
+						.style("fill", function(dHere){
+							return (d && d.id == dHere.id) ? '#f00' : '#fff';
+						})
+						.attr("stroke", function(dHere){
+							return (d && d.id == dHere.id) ? '#f00' : '#fff';
+						})
+						.attr("stroke-width", function(dHere){
+							return (d && d.id == dHere.id) ? '10' : '0';
+						});
+
+					d3.selectAll('circle.connect, circle.station')
+						.transition()
+						.duration(1000)
+						.attr("cx", function(d) { 
+							return d.x; 
+						})
+						.attr("cy", function(d) { 
+							return d.y; 
+						});
+
+					d3.selectAll("line.route, line.stripe")
+						.transition()
+						.duration(1000)
+						.attr("x1", function(d) { return d.source.x; })
+						.attr("y1", function(d) { return d.source.y; })
+						.attr("x2", function(d) { return d.target.x; })
+						.attr("y2", function(d) { return d.target.y; });
+
+				};
+
+				var station = vis.selectAll("circle.station")
+					.data(stations)
+					.enter()
+					.append("svg:circle")
+					.attr("class", "station")
+					.attr("id", function(d) { return 'station'+d.id })
+					.attr("cx", function(d) { return d.mapx; })
+					.attr("cy", function(d) { return d.mapy; })
+					.attr("r", 3)
+					// .style("stroke", 'black')
+					// .style("opacity", 0)
+					.style('fill', 'white')
+					.on('mouseover', function(d,i) {
+						d3.selectAll('#station'+d.id)
+						.transition()
+						.duration(25)
+						 .style('opacity', 1.0);
+						// console.log(d.name);
+					 })
+					.on('mouseout', function(d,i) {
+						d3.selectAll('#station'+d.id)
+						.transition()
+						.duration(25)
+						.style('opacity', 0.0);
+					 })
+					.on('click', selectStation)
+					.on("mouseover", function(d){
+						var text = d.name;
+						if (d.timeToCentre) {
+							text += " " + Math.round(parseFloat(d.timeToCentre)) + " min";
+						};
+						tooltip.text(text);
+						return tooltip.style("visibility", "visible");
+					})
+					.on("mousemove", function(){
+						return tooltip.style("top", (event.pageY-10)+"px").style("left",(event.pageX+10)+"px");
+					})
+					.on("mouseout", function(){
+						return tooltip.style("visibility", "hidden");
+					});
+	}); // load stations
+
+}
+
+// cribbed from here in double quick time: http://www.cs.cmu.edu/~crpalmer/sp/
+function updateShortestPaths(centre, stations) {
+
+	if (!centre) {
+		stations.forEach(function(s) {
+			s.x = s.mapx;
+			s.y = s.mapy;
+		});  
+		return;
+	}
+
+	stations.forEach(function(s) {
+		s.timeToCentre = (s == centre) ? 0 : Number.MAX_VALUE;
+		s.pathParent = null;
+	});
+
+	var queue = [];
+	queue.push(centre); 
+	
+	function compareTimes(a,b) {
+		return a.timeToCentre < b.timeToCentre ? -1 : a.timeToCentre > b.timeToCentre ? 1 : 0;
+	}
+
+	while (queue.length > 0) {
+		queue.sort(compareTimes);
+		var v = queue.pop();
+		for (var i = 0; i < v.conns.length; i++) {
+			var c = v.conns[i];
+			var u = (c.source == v) ? c.target : c.source;
+			if (c.time + v.timeToCentre < u.timeToCentre) {
+				u.pathParent = v;
+				u.timeToCentre = c.time + v.timeToCentre + 0.45;
+				queue.push(u);
+			}
+		}
+	}
+
+	stations.forEach(function(s) {
+		var ang = Math.atan2(s.mapy - centre.mapy, s.mapx - centre.mapx),
+				rad = pixelsPerMinute * s.timeToCentre; // todo: limit to min(width/2,height/2)?
+		s.x = centre.mapx + (rad * Math.cos(ang));
+		s.y = centre.mapy + (rad * Math.sin(ang));
+
+	});
+
+}
+		
+		</script>
+	</head>
+	<body>
+		<div id="content">
+			
+			<table width="100%" class="header">
+				<tr>
+					<td>
+						<h1 class="title">time map</h1>
+					</td>
+					<td align="right">
+						<form class="naviForm">
+							<select id="navi"></select>
+						</form>
+					</td>
+				</tr>			
+			</table>
+
+			<div id="map">
+			</div>
+
+		</div>
+		 
+	</body>
+</html>
